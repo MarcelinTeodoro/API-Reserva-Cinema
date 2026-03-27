@@ -20,8 +20,9 @@ API do Grupo B - Gerenciamento de Reservas de Assentos
    ```
 4. **Executar prisma**
 
-    ```npx prisma generate
-   ```
+    ```bash
+    npx prisma generate
+    ```
 
 5. **Rodar em desenvolvimento:**
    ```bash
@@ -41,6 +42,8 @@ O servidor estará disponível em `http://localhost:3333`
 
 Criar uma reserva de assento.
 
+**Sistema de Assentos:** Os assentos são representados por uma matriz, onde cada assento tem uma fileira (linha) e coluna (posição na fileira). O número do assento é derivado automaticamente (ex: fileira 1, coluna 1 = "A1").
+
 **Entrada:**
 ```json
 {
@@ -48,7 +51,8 @@ Criar uma reserva de assento.
   "id_filme": "filme_123",
   "id_sala": "sala_04",
   "horario": "2026-03-13T20:00:00Z",
-  "assento_solicitado": "H10"
+  "fileira": 8,
+  "coluna": 10
 }
 ```
 
