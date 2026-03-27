@@ -18,8 +18,12 @@ API do Grupo B - Gerenciamento de Reservas de Assentos
    ```bash
    npx prisma migrate dev --name init
    ```
+4. **Executar prisma**
 
-4. **Rodar em desenvolvimento:**
+    ```npx prisma generate
+   ```
+
+5. **Rodar em desenvolvimento:**
    ```bash
    npm run dev
    ```
@@ -28,6 +32,8 @@ API do Grupo B - Gerenciamento de Reservas de Assentos
    ```bash
    npm start
    ```
+
+
 
 O servidor estará disponível em `http://localhost:3333`
 
@@ -85,3 +91,4 @@ Assentos expirados são liberados automaticamente a cada 1 minuto.
 - `app/controllers/` - Rotas da API
 - `app/server.ts` - Setup Fastify
 - `prisma/schema.prisma` - Modelos de dados
+
