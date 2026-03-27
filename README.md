@@ -18,8 +18,12 @@ API do Grupo B - Gerenciamento de Reservas de Assentos
    ```bash
    npx prisma migrate dev --name init
    ```
+4. **Executar prisma**
 
-4. **Rodar em desenvolvimento:**
+    ```npx prisma generate
+   ```
+
+5. **Rodar em desenvolvimento:**
    ```bash
    npm run dev
    ```
