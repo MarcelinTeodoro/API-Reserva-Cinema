@@ -33,8 +33,6 @@ API do Grupo B - Gerenciamento de Reservas de Assentos
    npm start
    ```
 
-
-
 O servidor estará disponível em `http://localhost:3333`
 
 ## API
@@ -91,4 +89,3 @@ Assentos expirados são liberados automaticamente a cada 1 minuto.
 - `app/controllers/` - Rotas da API
 - `app/server.ts` - Setup Fastify
 - `prisma/schema.prisma` - Modelos de dados
-
