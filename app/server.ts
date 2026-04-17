@@ -20,7 +20,7 @@ process.on('SIGTERM', () => {
   app.close();
 });
 
-export async function start(porta: number = 3333) {
+export async function start(porta: number = 6969) {
   try {
     await app.listen({ port: porta, host: '0.0.0.0' });
     console.log(`✓ Servidor rodando na porta ${porta}`);
