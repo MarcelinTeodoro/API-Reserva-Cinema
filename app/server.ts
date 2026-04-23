@@ -1,33 +1,30 @@
-import Fastify from 'fastify';
-import { criarReserva } from './controllers/reservasController';
-import { liberarAssentosExpirados } from './models/reservaModel';
+import Fastify from "fastify";
+import { ZodError } from "zod";
+import { registerRoutes } from "./routes";
 
-const app = Fastify();
+export function buildServer() {
+  const app = Fastify({
+    logger: true,
+    connectionTimeout: 310_000,
+    keepAliveTimeout: 310_000,
+    requestTimeout: 310_000,
+  });
 
-// Job de limpeza: liberar assentos expirados a cada 1 minuto
-const jobLimpeza = setInterval(() => {
-  liberarAssentosExpirados();
-}, 60 * 1000); // 1 minuto
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.status(400).send({
+        codigo: "VALIDACAO_INVALIDA",
+        mensagem: "Dados inválidos.",
+        detalhes: error.issues,
+      });
+    }
+    app.log.error(error);
+    return reply.status(500).send({
+      codigo: "ERRO_INTERNO",
+      mensagem: "Erro interno do servidor.",
+    });
+  });
 
-// Rota: POST /reservas
-app.post<{ Body: any }>('/reservas', async (request, reply) => {
-  await criarReserva(request, reply);
-});
-
-// Limpeza ao desligar
-process.on('SIGTERM', () => {
-  clearInterval(jobLimpeza);
-  app.close();
-});
-
-export async function start(porta: number = 6969) {
-  try {
-    await app.listen({ port: porta, host: '0.0.0.0' });
-    console.log(`✓ Servidor rodando na porta ${porta}`);
-  } catch (err) {
-    console.error('Erro ao iniciar servidor:', err);
-    process.exit(1);
-  }
+  registerRoutes(app);
+  return app;
 }
-
-export default app;

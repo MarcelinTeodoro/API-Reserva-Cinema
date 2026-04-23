@@ -1,11 +1,17 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const criarReservaSchema = z.object({
-  id_usuario: z.string().min(1, 'id_usuario é obrigatório'),
-  id_filme: z.string().min(1, 'id_filme é obrigatório'),
-  id_sala: z.string().min(1, 'id_sala é obrigatório'),
-  horario: z.string().datetime('horario deve ser uma data ISO válida'),
-  assento_solicitado: z.string().min(1, 'assento_solicitado é obrigatório'),
+export const sessionParamsSchema = z.object({
+  sessionId: z.string().min(1),
 });
 
-export type CriarReservaDTO = z.infer<typeof criarReservaSchema>;
+export const assentoRegex = /^[A-E]([1-9]|10)$/;
+
+export const reservaBodySchema = z
+  .object({
+    dataHoraFim: z.coerce.date(),
+    assentos: z.array(z.string().regex(assentoRegex)).min(1),
+  })
+  .passthrough();
+
+export type ReservaBody = z.infer<typeof reservaBodySchema>;
+export type SessionParams = z.infer<typeof sessionParamsSchema>;

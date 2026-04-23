@@ -11,34 +11,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Assento {
-  id            String    @id @default(cuid())
-  salaId        String
-  numero        String    // Ex: "H10", "A01"
-  status        String    @default("LIVRE") // LIVRE | BLOQUEADO | RESERVADO
-  bloqueadoEm   DateTime?
-  expiradoEm    DateTime?
-  criadoEm      DateTime  @default(now())
-  atualizadoEm  DateTime  @updatedAt
-
-  reservas      Reserva[] @relation("AssentoReservas")
-
-  @@unique([salaId, numero])
+model Sessao {
+  id          String    @id
+  dataHoraFim DateTime
+  assentos    Assento[]
 }
 
-model Reserva {
-  id            String    @id @default(cuid())
-  usuarioId     String
-  filmeId       String
-  salaId        String
-  horario       DateTime
-  status        String    @default("PENDENTE") // PENDENTE | CONFIRMADA | CANCELADA
-  assentoId     String
-  criadoEm      DateTime  @default(now())
-  expiradoEm    DateTime
-  atualizadoEm  DateTime  @updatedAt
+model Assento {
+  id           String   @id @default(cuid())
+  sessaoId     String
+  numero       String
+  status       String
+  atualizadoEm DateTime @updatedAt
+  sessao       Sessao   @relation(fields: [sessaoId], references: [id], onDelete: Cascade)
 
-  assento       Assento   @relation("AssentoReservas", fields: [assentoId], references: [id], onDelete: Cascade)
-
-  @@unique([assentoId, status])
+  @@unique([sessaoId, numero])
+  @@index([sessaoId])
+  @@index([status, atualizadoEm])
 }

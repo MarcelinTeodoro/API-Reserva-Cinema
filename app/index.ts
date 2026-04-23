@@ -1,7 +1,18 @@
-import 'dotenv/config';
-import { start } from './server';
+import "dotenv/config";
+import { buildServer } from "./server";
+import { iniciarCronLiberacao } from "./jobs/liberarPendentes";
 
-const portaEnv = Number(process.env.PORT);
-const PORTA = Number.isInteger(portaEnv) && portaEnv > 0 ? portaEnv : 3333;
+async function main() {
+  const app = buildServer();
+  const port = Number(process.env.PORT ?? 6969);
 
-start(PORTA);
+  try {
+    await app.listen({ port, host: "0.0.0.0" });
+    iniciarCronLiberacao();
+  } catch (err) {
+    app.log.error(err);
+    process.exit(1);
+  }
+}
+
+main();

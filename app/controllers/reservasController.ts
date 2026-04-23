@@ -1,59 +1,73 @@
-import { FastifyRequest, FastifyReply } from 'fastify';
-import { ZodError } from 'zod';
-import { criarReservaSchema } from '../validators/reservaValidator';
-import { criarReservaTemporaria, confirmarReserva, cancelarReserva, formatarReservaResponse } from '../models/reservaModel';
-import { enviarParaPagamento } from '../models/grupoC';
+import { FastifyReply, FastifyRequest } from "fastify";
+import {
+  reservaBodySchema,
+  sessionParamsSchema,
+} from "../validators/reservaValidator";
+import {
+  atualizarStatusAssentos,
+  buscarAssentosIndisponiveis,
+  marcarAssentosPendentes,
+  reverterParaDisponivel,
+  upsertSessao,
+} from "../models/assentoModel";
+import { STATUS } from "../lib/assentos";
+import {
+  GrupoCError,
+  TimeoutError,
+  encaminharParaGrupoC,
+} from "../services/grupoCService";
 
-export async function criarReserva(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    // Validar entrada
-    const dados = criarReservaSchema.parse(request.body);
+export async function criarReserva(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const { sessionId } = sessionParamsSchema.parse(request.params);
+  const body = reservaBodySchema.parse(request.body);
 
-    // Etapa 1: Criar reserva temporária e bloquear assento
-    const resultadoReserva = await criarReservaTemporaria(dados);
-
-    if (!resultadoReserva.sucesso) {
-      return reply.status(409).send({
-        erro: 'ASSENTO_INDISPONIVEL',
-        mensagem: resultadoReserva.erroMsg || 'Assento não está disponível',
-      });
-    }
-
-    const reserva = resultadoReserva.reserva;
-    const reservaFormatada = formatarReservaResponse(resultadoReserva.reserva);
-
-    // Etapa 2: Enviar para Grupo C (Pagamentos)
-    const resultadoPagamento = await enviarParaPagamento(reservaFormatada);
-
-    if (!resultadoPagamento.sucesso) {
-      // Pagamento recusado: desfazer bloqueio
-      await cancelarReserva(reserva.id);
-
-      return reply.status(402).send({
-        erro: 'PAGAMENTO_RECUSADO',
-        mensagem: resultadoPagamento.erro?.mensagem || 'Pagamento foi recusado',
-        detalhes: resultadoPagamento.erro,
-      });
-    }
-
-    // Etapa 3: Confirmar reserva
-    await confirmarReserva(reserva.id);
-
-    // Retornar resposta com dados formatados
-    return reply.status(201).send(reservaFormatada);
-  } catch (err) {
-    if (err instanceof ZodError) {
-      return reply.status(400).send({
-        erro: 'VALIDACAO_FALHOU',
-        mensagem: 'Dados inválidos fornecidos',
-        detalhes: err.issues,
-      });
-    }
-
-    console.error('Erro ao criar reserva:', err);
-    return reply.status(500).send({
-      erro: 'ERRO_INTERNO',
-      mensagem: 'Erro ao processar reserva',
+  if (body.dataHoraFim.getTime() < Date.now()) {
+    return reply.status(400).send({
+      codigo: "SESSAO_EXPIRADA",
+      mensagem: "A sessão já foi encerrada.",
     });
+  }
+
+  await upsertSessao(sessionId, body.dataHoraFim);
+
+  const indisponiveis = await buscarAssentosIndisponiveis(
+    sessionId,
+    body.assentos
+  );
+  if (indisponiveis.length > 0) {
+    return reply.status(409).send({
+      codigo: "ASSENTOS_INDISPONIVEIS",
+      mensagem: "Assentos indisponíveis",
+      assentos: indisponiveis,
+    });
+  }
+
+  await marcarAssentosPendentes(sessionId, body.assentos);
+
+  try {
+    const resposta = await encaminharParaGrupoC(request.body);
+    await atualizarStatusAssentos(sessionId, body.assentos, STATUS.OCUPADO);
+    return reply.status(200).send({
+      sessionId,
+      assentos: body.assentos,
+      status: STATUS.OCUPADO,
+      grupoC: resposta,
+    });
+  } catch (err) {
+    await reverterParaDisponivel(sessionId, body.assentos);
+
+    if (err instanceof TimeoutError) {
+      return reply.status(504).send({
+        codigo: "TIMEOUT_GRUPO_C",
+        mensagem: err.message,
+      });
+    }
+    if (err instanceof GrupoCError) {
+      return reply.status(err.status).send(err.payload);
+    }
+    throw err;
   }
 }
