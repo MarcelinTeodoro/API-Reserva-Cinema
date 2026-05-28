@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard de Sessoes | API Reserva Cinema</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/dashboard.css" />
+    <script src="/dashboard.js" defer></script>
+  </head>
+  <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+    <div class="bg-grid"></div>
+
+    <div class="app-shell">
+      <header class="card hero">
+        <div>
+          <p class="eyebrow">Painel Operacional</p>
+          <h1>Cinema Seatboard</h1>
+          <p class="subtitle">
+            Visao completa por sessao com mapa de assentos e indicadores em tempo
+            real.
+          </p>
+        </div>
+
+        <div class="hero-actions">
+          <button id="refreshBtn" class="button button-primary" type="button">
+            Atualizar agora
+          </button>
+          <label class="toggle">
+            <input id="autoRefresh" type="checkbox" checked />
+            <span>Atualizacao automatica</span>
+          </label>
+          <p id="lastSync" class="muted">Sem atualizacao.</p>
+        </div>
+      </header>
+
+      <section id="statsGrid" class="stats-grid" aria-live="polite"></section>
+
+      <section class="main-grid">
+        <aside class="card sessions-pane">
+          <div class="pane-head">
+            <h2>Sessoes monitoradas</h2>
+            <span id="sessionCountBadge" class="chip">0 sessoes</span>
+          </div>
+
+          <div class="controls">
+            <input
+              id="searchInput"
+              type="search"
+              placeholder="Buscar por sessionId"
+              autocomplete="off"
+            />
+            <select id="statusFilter">
+              <option value="all">Todas</option>
+              <option value="active">Ativas</option>
+              <option value="closed">Encerradas</option>
+            </select>
+          </div>
+
+          <form id="monitorForm" class="monitor-form">
+            <input
+              id="monitorInput"
+              type="text"
+              placeholder="Adicionar sessionId para monitorar"
+              autocomplete="off"
+            />
+            <button class="button button-soft" type="submit">Monitorar</button>
+          </form>
+          <p class="hint">
+            Mesmo sem reserva criada, a sessao aparece com 50 assentos
+            disponiveis.
+          </p>
+
+          <div id="sessionsList" class="sessions-list"></div>
+        </aside>
+
+        <main class="card details-pane">
+          <div class="pane-head">
+            <h2 id="selectedSessionTitle">Selecione uma sessao</h2>
+            <span id="selectedSessionBadge" class="chip chip-neutral">Sem dados</span>
+          </div>
+
+          <div id="sessionMeta" class="session-meta"></div>
+
+          <div class="legend">
+            <span><i class="dot dot-available"></i>Disponivel</span>
+            <span><i class="dot dot-pending"></i>Pendente</span>
+            <span><i class="dot dot-occupied"></i>Ocupado</span>
+          </div>
+
+          <div id="seatGrid" class="seat-grid"></div>
+
+          <div class="quick-actions">
+            <button id="cleanupBtn" class="button button-soft" type="button">
+              Rodar limpeza de sessoes encerradas
+            </button>
+            <p id="cleanupResult" class="muted"></p>
+          </div>
+        </main>
+      </section>
+    </div>
+  </body>
+</html>
