@@ -1,5 +1,16 @@
+import { Prisma } from "../generated/prisma";
 import { prisma } from "../lib/prisma";
 import { STATUS, TODOS_ASSENTOS } from "../lib/assentos";
+
+export class AssentosIndisponiveisError extends Error {
+  assentos: string[];
+
+  constructor(assentos: string[]) {
+    super("Assentos indisponiveis.");
+    this.name = "AssentosIndisponiveisError";
+    this.assentos = assentos;
+  }
+}
 
 export async function listarAssentosDisponiveis(sessionId: string) {
   const sessao = await prisma.sessao.findUnique({
@@ -45,15 +56,26 @@ export async function marcarAssentosPendentes(
   sessionId: string,
   numeros: string[]
 ) {
-  await prisma.$transaction(
-    numeros.map((numero) =>
-      prisma.assento.upsert({
-        where: { sessaoId_numero: { sessaoId: sessionId, numero } },
-        update: { status: STATUS.PENDENTE },
-        create: { sessaoId: sessionId, numero, status: STATUS.PENDENTE },
-      })
-    )
-  );
+  try {
+    await prisma.$transaction(
+      numeros.map((numero) =>
+        prisma.assento.create({
+          data: { sessaoId: sessionId, numero, status: STATUS.PENDENTE },
+        })
+      )
+    );
+  } catch (err: unknown) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        const indisponiveis = await buscarAssentosIndisponiveis(
+          sessionId,
+          numeros
+        );
+        throw new AssentosIndisponiveisError(indisponiveis);
+      }
+    }
+    throw err;
+  }
 }
 
 export async function atualizarStatusAssentos(

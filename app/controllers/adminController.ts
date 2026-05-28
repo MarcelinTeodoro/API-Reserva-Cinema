@@ -6,8 +6,11 @@ export async function limpezaSessoes(
   _request: FastifyRequest,
   reply: FastifyReply
 ) {
+  console.log("[admin] Requisicao recebida para limpeza de sessoes.");
+
   const agora = new Date();
 
+  console.log("[admin] Buscando sessoes encerradas.");
   const sessoes = await prisma.sessao.findMany({
     where: { dataHoraFim: { lt: agora } },
     include: {
@@ -20,18 +23,20 @@ export async function limpezaSessoes(
 
   const sessoesLimpas = sessoes.length;
   const assentosOcupadosRemovidos = sessoes.reduce(
-    (total, s) => total + s.assentos.length,
+    (total, sessao) => total + sessao.assentos.length,
     0
   );
 
   if (sessoesLimpas > 0) {
+    console.log(`[admin] Removendo ${sessoesLimpas} sessoes encerradas.`);
     await prisma.sessao.deleteMany({
-      where: { id: { in: sessoes.map((s) => s.id) } },
+      where: { id: { in: sessoes.map((sessao) => sessao.id) } },
     });
   }
 
+  console.log("[admin] Limpeza concluida. Respondendo requisicao.");
   return reply.send({
-    mensagem: "Limpeza concluída",
+    mensagem: "Limpeza concluida",
     sessoesLimpas,
     assentosOcupadosRemovidos,
   });

@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { ZodError } from "zod";
+import { sendError } from "./lib/httpError";
 import { registerRoutes } from "./routes";
 
 export function buildServer() {
@@ -12,17 +13,11 @@ export function buildServer() {
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
-      return reply.status(400).send({
-        codigo: "VALIDACAO_INVALIDA",
-        mensagem: "Dados inválidos.",
-        detalhes: error.issues,
-      });
+      return sendError(reply, 400, "Dados invalidos.", error.issues);
     }
+
     app.log.error(error);
-    return reply.status(500).send({
-      codigo: "ERRO_INTERNO",
-      mensagem: "Erro interno do servidor.",
-    });
+    return sendError(reply, 500, "Erro interno do servidor.");
   });
 
   registerRoutes(app);

@@ -1,3 +1,4 @@
 node_modules/
 /app/generated/prisma
 .env
+/prisma/*.db

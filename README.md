@@ -1,95 +1,180 @@
 # API-Reserva-Cinema
 
-API do Grupo B - Gerenciamento de Reservas de Assentos
+API do Grupo B para gerenciamento de reservas de assentos de cinema.
 
 ## Setup
 
-1. **Instalar dependências:**
-   ```bash
-   npm install
-   ```
+1. Instalar dependencias:
 
-2. **Configurar variáveis de ambiente:**
-   - Copiar `.env.example` para `.env`
-   - Atualizar `DATABASE_URL` com sua conexão
-   - Atualizar `GRUPO_C_URL` com a URL real do Grupo C (Pagamentos)
+```bash
+npm install
+```
 
-3. **Executar migrações Prisma:**
-   ```bash
-   npx prisma migrate dev --name init
-   ```
-4. **Executar prisma**
+2. Configurar variaveis de ambiente:
 
-    ```bash
-    npx prisma generate
-    ```
+- Copiar `.env.example` para `.env`
+- Atualizar `DATABASE_URL`, se necessario
+- Atualizar `GRUPO_C_URL` com a URL real do Grupo C
 
-5. **Rodar em desenvolvimento:**
-   ```bash
-   npm run dev
-   ```
+3. Executar as migrations:
 
-   Ou rodar em produção:
-   ```bash
-   npm start
-   ```
+```bash
+npx prisma migrate dev
+```
 
-O servidor estará disponível em `http://localhost:3333`
+4. Gerar o Prisma Client:
 
-## API
+```bash
+npx prisma generate
+```
 
-### POST /reservas
+5. Rodar em desenvolvimento:
 
-Criar uma reserva de assento.
+```bash
+npm run dev
+```
 
-**Sistema de Assentos:** Os assentos são representados por uma matriz, onde cada assento tem uma fileira (linha) e coluna (posição na fileira). O número do assento é derivado automaticamente (ex: fileira 1, coluna 1 = "A1").
+Ou rodar diretamente:
 
-**Entrada:**
+```bash
+npm start
+```
+
+Por padrao, o servidor roda em:
+
+```text
+http://localhost:6999
+```
+
+## Variaveis de Ambiente
+
+```env
+DATABASE_URL="file:./dev.db"
+PORT=6999
+GRUPO_C_URL="https://url-do-grupo-c"
+```
+
+## Assentos
+
+A sala possui 50 assentos, de `A1` ate `E10`.
+
+Estados internos dos assentos:
+
+- `PENDENTE`: assento bloqueado enquanto a API aguarda o Grupo C
+- `OCUPADO`: reserva confirmada
+
+Assentos disponiveis nao ficam gravados como linhas fixas no banco. Eles sao calculados removendo da lista total os assentos pendentes ou ocupados.
+
+## Rotas
+
+### GET /sessoes/:sessionId/assentos
+
+Lista os assentos disponiveis de uma sessao.
+
+Resposta:
+
 ```json
 {
-  "id_usuario": "user_789",
-  "id_filme": "filme_123",
-  "id_sala": "sala_04",
-  "horario": "2026-03-13T20:00:00Z",
-  "fileira": 8,
-  "coluna": 10
+  "sessionId": "sessao-1",
+  "assentos": ["A1", "A2", "A3"]
 }
 ```
 
-**Resposta (201):**
+### POST /sessoes/:sessionId/reservas
+
+Cria uma reserva para uma sessao.
+
+Entrada:
+
 ```json
 {
-  "id_reserva": "res_abc123",
+  "dataHoraFim": "2026-06-01T23:00:00.000Z",
+  "assentos": ["A1", "A2"],
   "id_usuario": "user_789",
   "id_filme": "filme_123",
   "id_sala": "sala_04",
-  "horario": "2026-03-13T20:00:00Z",
-  "assento_reservado": "H10",
-  "criado_em": "2026-03-13T09:20:00Z",
-  "expira_em": "2026-03-13T09:30:00Z"
+  "horario": "2026-06-01T20:00:00.000Z"
 }
 ```
 
-**Erros:**
-- `409` - Assento indisponível
-- `402` - Pagamento recusado
-- `400` - Dados inválidos
-- `500` - Erro interno
+A API valida apenas `dataHoraFim` e `assentos`. O body recebido pela API e enviado para o Grupo C com todos os campos originais, inclusive campos que o Grupo B nao utiliza.
 
-## Fluxo
+Resposta de sucesso:
 
-1. Validar entrada (Zod)
-2. Bloquear assento por 10 minutos
-3. Enviar para Grupo C (pagamento)
-4. Se sucesso: confirmar reserva
-5. Se erro: desfazer bloqueio e retornar erro
+```json
+{
+  "sessionId": "sessao-1",
+  "assentos": ["A1", "A2"],
+  "status": "OCUPADO",
+  "grupoC": {
+    "status": "aprovado"
+  }
+}
+```
 
-Assentos expirados são liberados automaticamente a cada 1 minuto.
+O campo `grupoC` contem o retorno do Grupo C sem remover campos.
+
+Erros principais:
+
+- `400`: dados invalidos ou sessao encerrada
+- `409`: um ou mais assentos indisponiveis
+- `504`: Grupo C nao respondeu em ate 15 segundos
+- `500`: erro interno
+
+Formato padrao de erro:
+
+```json
+{
+  "statusCode": 400,
+  "error": "Bad Request",
+  "message": "Mensagem amigavel sobre o erro",
+  "details": []
+}
+```
+
+`details` e opcional. Em erros de validacao, contem os detalhes do Zod. Em erros retornados pelo Grupo C, contem exatamente o payload retornado pelo Grupo C.
+
+### GET /admin/limpeza-sessoes
+
+Remove sessoes encerradas e seus assentos ocupados.
+
+Resposta:
+
+```json
+{
+  "mensagem": "Limpeza concluida",
+  "sessoesLimpas": 1,
+  "assentosOcupadosRemovidos": 2
+}
+```
+
+## Fluxo da Reserva
+
+1. A API recebe `POST /sessoes/:sessionId/reservas`.
+2. Valida `sessionId`, `dataHoraFim` e `assentos`.
+3. Cria ou atualiza a sessao no banco.
+4. Confere se os assentos estao livres.
+5. Marca os assentos como `PENDENTE` em uma transacao.
+6. Envia o body original para o Grupo C, sem filtrar campos.
+7. Se o Grupo C aprovar, marca os assentos como `OCUPADO` e devolve o retorno dele em `grupoC`.
+8. Se o Grupo C falhar ou demorar mais de 15 segundos, libera os assentos pendentes. Se houver payload de erro do Grupo C, ele volta completo em `details`.
+9. A cada 5 segundos durante a chamada ao Grupo C, a API imprime um aviso no console para mostrar que ela ainda esta rodando e aguardando a outra equipe.
+
+## Limpeza Automatica
+
+Assentos pendentes antigos sao liberados automaticamente pelo job interno.
+
+Config atual:
+
+- Intervalo do job: 5 minutos
+- Tempo para considerar pendente expirado: 6 minutos
 
 ## Arquitetura
 
-- `app/validators/` - Schemas Zod para validação
-- `app/models/` - Lógica de negócio (reservas, integração com Grupo C)
-- `app/controllers/` - Rotas da API
-- `app/server.ts` - Setup Fastify
-- `prisma/schema.prisma` - Modelos de dados
+- `app/validators/`: schemas Zod
+- `app/models/`: acesso ao banco e regras de assentos
+- `app/controllers/`: handlers das rotas
+- `app/services/`: integracao com Grupo C
+- `app/jobs/`: limpeza de pendentes
+- `app/server.ts`: setup Fastify
+- `prisma/schema.prisma`: estrutura do banco
