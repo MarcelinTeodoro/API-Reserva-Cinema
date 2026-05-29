@@ -105,6 +105,33 @@
           </div>
         </main>
       </section>
+
+      <section class="card terminal-pane">
+        <div class="pane-head">
+          <h2>Console em Tempo Real</h2>
+          <div class="terminal-controls">
+            <label class="toggle toggle-compact">
+              <input id="terminalPause" type="checkbox" />
+              <span>Pausar</span>
+            </label>
+            <label class="toggle toggle-compact">
+              <input id="terminalAutoScroll" type="checkbox" checked />
+              <span>Auto-scroll</span>
+            </label>
+            <button id="clearTerminalBtn" class="button button-soft" type="button">
+              Limpar tela
+            </button>
+          </div>
+        </div>
+        <p class="terminal-caption">
+          Entradas e respostas HTTP da API no estilo terminal.
+        </p>
+        <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
+        <div class="terminal-status-row">
+          <p id="terminalCursor" class="muted">Cursor: 0</p>
+          <p id="terminalState" class="muted">Conectando...</p>
+        </div>
+      </section>
     </div>
   </body>
 </html>

@@ -2,10 +2,13 @@ const API = {
   listarSessoes: "/sessoes",
   mapaSessao: (sessionId) => `/sessoes/${encodeURIComponent(sessionId)}/mapa`,
   limparSessoes: "/admin/limpeza-sessoes",
+  logs: "/dashboard/logs",
 };
 
 const STORAGE_KEY = "cinema-dashboard-monitored-sessions";
 const REFRESH_INTERVAL_MS = 15000;
+const LOG_POLL_INTERVAL_MS = 1400;
+const TERMINAL_MAX_LINES = 320;
 
 const elements = {
   statsGrid: document.querySelector("#statsGrid"),
@@ -24,6 +27,12 @@ const elements = {
   refreshBtn: document.querySelector("#refreshBtn"),
   autoRefresh: document.querySelector("#autoRefresh"),
   lastSync: document.querySelector("#lastSync"),
+  terminalOutput: document.querySelector("#terminalOutput"),
+  terminalCursor: document.querySelector("#terminalCursor"),
+  terminalState: document.querySelector("#terminalState"),
+  terminalPause: document.querySelector("#terminalPause"),
+  terminalAutoScroll: document.querySelector("#terminalAutoScroll"),
+  clearTerminalBtn: document.querySelector("#clearTerminalBtn"),
 };
 
 const state = {
@@ -34,6 +43,10 @@ const state = {
   monitoredSessionIds: loadMonitoredSessionIds(),
   mapaPorSessao: new Map(),
   refreshTimer: null,
+  terminal: {
+    cursor: 0,
+    timer: null,
+  },
 };
 
 let mapRequestId = 0;
@@ -64,6 +77,74 @@ function formatDate(dateValue) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function terminalLevelClass(level) {
+  const upper = String(level || "").toUpperCase();
+  if (upper === "SUCCESS") return "level-success";
+  if (upper === "WARN") return "level-warn";
+  if (upper === "ERROR") return "level-error";
+  return "level-info";
+}
+
+function formatTerminalTime(timestamp) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "--:--:--";
+  return date.toLocaleTimeString("pt-BR", { hour12: false });
+}
+
+function isNearTerminalBottom() {
+  const output = elements.terminalOutput;
+  const threshold = 24;
+  return output.scrollHeight - output.scrollTop - output.clientHeight <= threshold;
+}
+
+function updateTerminalStatus(text) {
+  elements.terminalState.textContent = text;
+}
+
+function updateTerminalCursor(value) {
+  elements.terminalCursor.textContent = `Cursor: ${value}`;
+}
+
+function appendTerminalLogs(logs) {
+  if (!Array.isArray(logs) || logs.length === 0) return;
+
+  const output = elements.terminalOutput;
+  const keepAtBottom =
+    elements.terminalAutoScroll.checked && (output.childElementCount === 0 || isNearTerminalBottom());
+
+  const html = logs
+    .map((entry) => {
+      const level = String(entry.level || "INFO").toUpperCase();
+      return `
+        <p class="terminal-line ${terminalLevelClass(level)}">
+          <span class="t-time">${escapeHtml(formatTerminalTime(entry.timestamp))}</span>
+          <span class="t-level">${escapeHtml(level)}</span>
+          <span class="t-message">[${escapeHtml(entry.source)}] ${escapeHtml(entry.message)}</span>
+        </p>
+      `;
+    })
+    .join("");
+
+  output.insertAdjacentHTML("beforeend", html);
+
+  while (output.childElementCount > TERMINAL_MAX_LINES) {
+    output.firstElementChild?.remove();
+  }
+
+  if (keepAtBottom) {
+    output.scrollTop = output.scrollHeight;
+  }
 }
 
 function seatClass(status) {
@@ -248,6 +329,53 @@ async function fetchJson(url) {
   return payload;
 }
 
+async function atualizarConsole() {
+  if (elements.terminalPause.checked) {
+    updateTerminalStatus("Pausado");
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      since: String(state.terminal.cursor),
+      limit: "120",
+    });
+    const payload = await fetchJson(`${API.logs}?${params.toString()}`);
+
+    const logs = Array.isArray(payload?.logs) ? payload.logs : [];
+    const cursor =
+      Number.isFinite(payload?.cursor) && payload.cursor >= state.terminal.cursor
+        ? payload.cursor
+        : state.terminal.cursor;
+
+    state.terminal.cursor = cursor;
+    updateTerminalCursor(state.terminal.cursor);
+    appendTerminalLogs(logs);
+
+    if (logs.length === 0) {
+      updateTerminalStatus("Conectado · sem novas entradas");
+      return;
+    }
+
+    updateTerminalStatus(`Conectado · ${logs.length} nova(s) entrada(s)`);
+  } catch (err) {
+    updateTerminalStatus(
+      err instanceof Error ? `Falha no console: ${err.message}` : "Falha ao atualizar console."
+    );
+  }
+}
+
+function configurarPollingConsole() {
+  if (state.terminal.timer) {
+    clearInterval(state.terminal.timer);
+    state.terminal.timer = null;
+  }
+
+  state.terminal.timer = setInterval(async () => {
+    await atualizarConsole();
+  }, LOG_POLL_INTERVAL_MS);
+}
+
 async function carregarSessaoMonitorada(sessionId) {
   const mapa = await fetchJson(API.mapaSessao(sessionId));
   return {
@@ -389,6 +517,26 @@ function bindEvents() {
     configureAutoRefresh();
   });
 
+  elements.terminalPause.addEventListener("change", async () => {
+    if (elements.terminalPause.checked) {
+      updateTerminalStatus("Pausado");
+      return;
+    }
+    updateTerminalStatus("Retomando atualizacao...");
+    await atualizarConsole();
+  });
+
+  elements.terminalAutoScroll.addEventListener("change", () => {
+    if (elements.terminalAutoScroll.checked) {
+      elements.terminalOutput.scrollTop = elements.terminalOutput.scrollHeight;
+    }
+  });
+
+  elements.clearTerminalBtn.addEventListener("click", () => {
+    elements.terminalOutput.innerHTML = "";
+    updateTerminalStatus("Tela limpa");
+  });
+
   elements.searchInput.addEventListener("input", (event) => {
     state.search = event.target.value;
     renderSessionsList();
@@ -428,6 +576,10 @@ function bindEvents() {
 async function bootstrap() {
   bindEvents();
   configureAutoRefresh();
+  configurarPollingConsole();
+  updateTerminalCursor(0);
+  updateTerminalStatus("Conectando...");
+  await atualizarConsole();
   await atualizarSessoes();
   await carregarMapaSelecionado();
 }

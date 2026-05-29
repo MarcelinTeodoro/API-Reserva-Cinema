@@ -77,6 +77,33 @@ Assentos disponiveis nao ficam gravados como linhas fixas no banco. Eles sao cal
 
 Abre o dashboard web com visao de sessoes e mapa de assentos.
 
+### GET /dashboard/logs
+
+Retorna logs do console do dashboard (entradas e respostas HTTP em memoria).
+
+Query params opcionais:
+
+- `since`: retorna apenas logs com `id` maior que esse valor
+- `limit`: quantidade maxima de linhas (padrao 120, maximo 250)
+
+Resposta:
+
+```json
+{
+  "logs": [
+    {
+      "id": 10,
+      "timestamp": "2026-05-29T23:11:22.000Z",
+      "level": "SUCCESS",
+      "source": "HTTP",
+      "message": "<< GET /sessoes 200 (5ms)"
+    }
+  ],
+  "cursor": 10,
+  "totalBuffer": 18
+}
+```
+
 ### GET /sessoes
 
 Lista resumo das sessoes registradas no banco.
