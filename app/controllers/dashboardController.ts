@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { FastifyReply, FastifyRequest } from "fastify";
 import { sendError } from "../lib/httpError";
 import { listarLogsConsole } from "../lib/dashboardConsole";
+import { listarFlowEvents } from "../lib/flowEvents";
 
 const PUBLIC_DIR = join(process.cwd(), "app", "public");
 
@@ -61,4 +62,15 @@ export async function listarLogsDashboard(
   const limit = parseIntComFallback(query.limit, 120, 1, 250);
 
   return reply.send(listarLogsConsole({ sinceId: since, limit }));
+}
+
+export async function listarEventosFluxoDashboard(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const query = (request.query as Record<string, unknown>) ?? {};
+  const since = parseIntComFallback(query.since, 0, 0, Number.MAX_SAFE_INTEGER);
+  const limit = parseIntComFallback(query.limit, 120, 1, 250);
+
+  return reply.send(listarFlowEvents({ sinceId: since, limit }));
 }

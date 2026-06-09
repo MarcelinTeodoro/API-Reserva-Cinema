@@ -35,9 +35,9 @@ function resumirBody(body: unknown) {
 export function buildServer() {
   const app = Fastify({
     logger: true,
-    connectionTimeout: 310_000,
-    keepAliveTimeout: 310_000,
-    requestTimeout: 310_000,
+    connectionTimeout: 30_000,
+    keepAliveTimeout: 30_000,
+    requestTimeout: 30_000,
   });
 
   app.addHook("onRequest", (request, _reply, done) => {

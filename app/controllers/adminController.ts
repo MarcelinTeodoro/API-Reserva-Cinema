@@ -1,12 +1,20 @@
 import { FastifyReply, FastifyRequest } from "fastify";
 import { prisma } from "../lib/prisma";
-import { STATUS } from "../lib/assentos";
+import { criarFlowId, registrarFlowEvent } from "../lib/flowEvents";
 
 export async function limpezaSessoes(
   _request: FastifyRequest,
   reply: FastifyReply
 ) {
   console.log("[admin] Requisicao recebida para limpeza de sessoes.");
+  const flowId = criarFlowId("limpeza");
+  registrarFlowEvent({
+    flowId,
+    level: "INFO",
+    from: "Group A",
+    to: "Group B",
+    message: "limpeza de sessoes encerradas solicitada",
+  });
 
   const agora = new Date();
 
@@ -15,14 +23,13 @@ export async function limpezaSessoes(
     where: { dataHoraFim: { lt: agora } },
     include: {
       assentos: {
-        where: { status: STATUS.OCUPADO },
         select: { id: true },
       },
     },
   });
 
   const sessoesLimpas = sessoes.length;
-  const assentosOcupadosRemovidos = sessoes.reduce(
+  const assentosRemovidos = sessoes.reduce(
     (total, sessao) => total + sessao.assentos.length,
     0
   );
@@ -34,10 +41,19 @@ export async function limpezaSessoes(
     });
   }
 
+  registrarFlowEvent({
+    flowId,
+    level: "SUCCESS",
+    from: "Group B",
+    to: "Database",
+    message: `${sessoesLimpas} sessoes e ${assentosRemovidos} assentos removidos`,
+  });
+
   console.log("[admin] Limpeza concluida. Respondendo requisicao.");
   return reply.send({
     mensagem: "Limpeza concluida",
     sessoesLimpas,
-    assentosOcupadosRemovidos,
+    assentosRemovidos,
+    assentosOcupadosRemovidos: assentosRemovidos,
   });
 }

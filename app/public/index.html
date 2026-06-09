@@ -106,9 +106,23 @@
         </main>
       </section>
 
+      <section class="card terminal-pane flow-pane">
+        <div class="pane-head">
+          <h2>Distributed Flow Console</h2>
+          <span id="flowCursor" class="chip chip-neutral">Cursor: 0</span>
+        </div>
+        <p class="terminal-caption">
+          Eventos relevantes do fluxo Grupo A, Grupo B, banco de dados e Grupo C.
+        </p>
+        <div id="flowOutput" class="flow-output" aria-live="polite"></div>
+        <div class="terminal-status-row">
+          <p id="flowState" class="muted">Conectando...</p>
+        </div>
+      </section>
+
       <section class="card terminal-pane">
         <div class="pane-head">
-          <h2>Console em Tempo Real</h2>
+          <h2>Technical Console</h2>
           <div class="terminal-controls">
             <label class="toggle toggle-compact">
               <input id="terminalPause" type="checkbox" />
@@ -124,7 +138,7 @@
           </div>
         </div>
         <p class="terminal-caption">
-          Entradas e respostas HTTP da API no estilo terminal.
+          Entradas e respostas HTTP da API, incluindo requisicoes tecnicas.
         </p>
         <div id="terminalOutput" class="terminal-output" aria-live="polite"></div>
         <div class="terminal-status-row">

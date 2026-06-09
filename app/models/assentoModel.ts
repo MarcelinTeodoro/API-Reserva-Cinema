@@ -158,12 +158,31 @@ export async function buscarAssentosIndisponiveis(
   return encontrados.map((a) => a.numero);
 }
 
-export async function upsertSessao(sessionId: string, dataHoraFim: Date) {
-  return prisma.sessao.upsert({
+export async function buscarOuCriarSessao(sessionId: string, dataHoraFim: Date) {
+  const sessaoExistente = await prisma.sessao.findUnique({
     where: { id: sessionId },
-    update: { dataHoraFim },
-    create: { id: sessionId, dataHoraFim },
+    select: { id: true, dataHoraFim: true },
   });
+
+  if (sessaoExistente) return sessaoExistente;
+
+  try {
+    return await prisma.sessao.create({
+      data: { id: sessionId, dataHoraFim },
+      select: { id: true, dataHoraFim: true },
+    });
+  } catch (err: unknown) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === "P2002") {
+        const sessaoCriada = await prisma.sessao.findUniqueOrThrow({
+          where: { id: sessionId },
+          select: { id: true, dataHoraFim: true },
+        });
+        return sessaoCriada;
+      }
+    }
+    throw err;
+  }
 }
 
 export async function marcarAssentosPendentes(

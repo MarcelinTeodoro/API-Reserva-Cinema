@@ -1,6 +1,14 @@
+import { registrarFlowEvent } from "../lib/flowEvents";
+
 export const GRUPO_C_TIMEOUT_MS = 15_000;
 const AVISO_GRUPO_C_MS = 5_000;
 const AVISOS_GRUPO_C = GRUPO_C_TIMEOUT_MS / AVISO_GRUPO_C_MS;
+
+type GrupoCFlowContext = {
+  flowId: string;
+  sessionId: string;
+  assentos: string[];
+};
 
 export class TimeoutError extends Error {
   constructor() {
@@ -21,7 +29,10 @@ export class GrupoCError extends Error {
   }
 }
 
-export async function encaminharParaGrupoC(body: unknown) {
+export async function encaminharParaGrupoC(
+  body: unknown,
+  flow?: GrupoCFlowContext
+) {
   const url = process.env.GRUPO_C_URL;
   if (!url) throw new Error("GRUPO_C_URL nao configurada.");
 
@@ -30,7 +41,7 @@ export async function encaminharParaGrupoC(body: unknown) {
     setTimeout(() => {
       const segundos = (i + 1) * 5;
       console.warn(
-        `[grupo-c] Ainda esperando resposta do Grupo C depois de ${segundos}s. Nossa API segue rodando.`
+        `[grupo-c] Aguardando resposta do Grupo C ha ${segundos}s.`
       );
     }, (i + 1) * AVISO_GRUPO_C_MS)
   );
@@ -38,17 +49,50 @@ export async function encaminharParaGrupoC(body: unknown) {
 
   let response: Response;
   try {
-    console.log("[grupo-c] Enviando reserva para o Grupo C.");
+    console.log("[grupo-c] Requisicao enviada ao Grupo C.");
+    if (flow) {
+      registrarFlowEvent({
+        flowId: flow.flowId,
+        level: "INFO",
+        from: "Group B",
+        to: "Group C",
+        message: "validacao de pagamento/reserva enviada",
+        sessionId: flow.sessionId,
+        assentos: flow.assentos,
+      });
+    }
     response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    console.log(`[grupo-c] Grupo C respondeu com status ${response.status}.`);
+    console.log(`[grupo-c] Resposta recebida com status ${response.status}.`);
   } catch (err: unknown) {
     if (err instanceof Error && err.name === "AbortError") {
+      if (flow) {
+        registrarFlowEvent({
+          flowId: flow.flowId,
+          level: "ERROR",
+          from: "Group C",
+          to: "Group B",
+          message: "timeout ao aguardar resposta",
+          sessionId: flow.sessionId,
+          assentos: flow.assentos,
+        });
+      }
       throw new TimeoutError();
+    }
+    if (flow) {
+      registrarFlowEvent({
+        flowId: flow.flowId,
+        level: "ERROR",
+        from: "Group C",
+        to: "Group B",
+        message: "falha ao contatar Grupo C",
+        sessionId: flow.sessionId,
+        assentos: flow.assentos,
+      });
     }
     throw err;
   } finally {
@@ -61,7 +105,32 @@ export async function encaminharParaGrupoC(body: unknown) {
     ? await response.json().catch(() => null)
     : await response.text().catch(() => null);
 
-  if (!response.ok) throw new GrupoCError(response.status, payload);
+  if (!response.ok) {
+    if (flow) {
+      registrarFlowEvent({
+        flowId: flow.flowId,
+        level: "ERROR",
+        from: "Group C",
+        to: "Group B",
+        message: `resposta recusada com status ${response.status}`,
+        sessionId: flow.sessionId,
+        assentos: flow.assentos,
+      });
+    }
+    throw new GrupoCError(response.status, payload);
+  }
+
+  if (flow) {
+    registrarFlowEvent({
+      flowId: flow.flowId,
+      level: "SUCCESS",
+      from: "Group C",
+      to: "Group B",
+      message: `resposta aprovada com status ${response.status}`,
+      sessionId: flow.sessionId,
+      assentos: flow.assentos,
+    });
+  }
 
   return payload;
 }

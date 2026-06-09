@@ -214,6 +214,10 @@ h2 {
   font-size: 1.4rem;
 }
 
+.stat-value.value-changed {
+  animation: value-pulse 420ms ease;
+}
+
 .main-grid {
   display: grid;
   gap: 1rem;
@@ -415,15 +419,20 @@ h2 {
 }
 
 .seat.pending {
-  background: color-mix(in srgb, var(--warning) 26%, white);
-  color: color-mix(in srgb, var(--warning) 72%, black);
-  border-color: color-mix(in srgb, var(--warning) 40%, white);
+  background: color-mix(in srgb, var(--warning) 42%, white);
+  color: color-mix(in srgb, var(--warning) 82%, black);
+  border-color: color-mix(in srgb, var(--warning) 65%, black);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.65);
 }
 
 .seat.occupied {
   background: color-mix(in srgb, var(--danger) 20%, white);
   color: color-mix(in srgb, var(--danger) 70%, black);
   border-color: color-mix(in srgb, var(--danger) 45%, white);
+}
+
+.seat.seat-changed {
+  animation: seat-pulse 720ms ease;
 }
 
 .quick-actions {
@@ -435,6 +444,10 @@ h2 {
 .terminal-pane {
   padding: 1rem;
   animation: rise-in 520ms ease both;
+}
+
+.flow-pane {
+  border-color: color-mix(in srgb, var(--info) 28%, var(--border));
 }
 
 .terminal-controls {
@@ -465,6 +478,94 @@ h2 {
   background: linear-gradient(180deg, #051723, #03111a);
   box-shadow: inset 0 0 0 1px rgba(124, 212, 255, 0.08);
   font-family: "JetBrains Mono", "Fira Code", Consolas, "Courier New", monospace;
+}
+
+.flow-output {
+  margin-top: 0.45rem;
+  max-height: 360px;
+  min-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.74);
+  display: grid;
+  gap: 0.65rem;
+}
+
+.flow-output:empty::before {
+  content: "Aguardando eventos do fluxo distribuido...";
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.flow-group {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem;
+}
+
+.flow-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.7rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.flow-group-title strong {
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.flow-events {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.flow-event {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(160px, auto) 1fr;
+  gap: 0.5rem;
+  align-items: baseline;
+  border-left: 4px solid var(--info);
+  border-radius: 8px;
+  padding: 0.36rem 0.45rem;
+  background: color-mix(in srgb, var(--info) 7%, white);
+  font-size: 0.82rem;
+}
+
+.flow-time {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.flow-path {
+  font-weight: 800;
+}
+
+.flow-message {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.flow-event.flow-success {
+  border-left-color: var(--success);
+  background: color-mix(in srgb, var(--success) 9%, white);
+}
+
+.flow-event.flow-warn {
+  border-left-color: var(--warning);
+  background: color-mix(in srgb, var(--warning) 13%, white);
+}
+
+.flow-event.flow-error {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, white);
 }
 
 .terminal-output:empty::before {
@@ -587,6 +688,30 @@ h2 {
   }
 }
 
+@keyframes value-pulse {
+  0% {
+    color: var(--accent);
+    transform: translateY(-1px);
+  }
+  100% {
+    color: var(--text);
+    transform: translateY(0);
+  }
+}
+
+@keyframes seat-pulse {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 3px rgba(242, 92, 44, 0.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @media (max-width: 1024px) {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -634,5 +759,9 @@ h2 {
   .terminal-output {
     max-height: 280px;
     min-height: 220px;
+  }
+
+  .flow-event {
+    grid-template-columns: 1fr;
   }
 }
