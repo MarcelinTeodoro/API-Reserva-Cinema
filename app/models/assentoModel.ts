@@ -1,6 +1,6 @@
 import { Prisma } from "../generated/prisma";
 import { prisma } from "../lib/prisma";
-import { STATUS, TODOS_ASSENTOS } from "../lib/assentos";
+import { STATUS, TODOS_ASSENTOS, StatusAssento } from "../lib/assentos";
 
 export class AssentosIndisponiveisError extends Error {
   assentos: string[];
@@ -27,6 +27,120 @@ export async function listarAssentosDisponiveis(sessionId: string) {
   );
 
   return TODOS_ASSENTOS.filter((n) => !indisponiveis.has(n));
+}
+
+type ResumoAssentos = {
+  disponiveis: number;
+  pendentes: number;
+  ocupados: number;
+  capacidadeTotal: number;
+  taxaOcupacao: number;
+};
+
+export type SessaoResumo = {
+  sessionId: string;
+  dataHoraFim: Date;
+  encerrada: boolean;
+  resumo: ResumoAssentos;
+};
+
+export type MapaAssento = {
+  numero: string;
+  status: StatusAssento;
+};
+
+export type SessaoMapa = {
+  sessionId: string;
+  existe: boolean;
+  dataHoraFim: Date | null;
+  encerrada: boolean;
+  resumo: ResumoAssentos;
+  assentos: MapaAssento[];
+};
+
+function calcularResumo(statuses: StatusAssento[]): ResumoAssentos {
+  let pendentes = 0;
+  let ocupados = 0;
+
+  for (const status of statuses) {
+    if (status === STATUS.PENDENTE) pendentes += 1;
+    if (status === STATUS.OCUPADO) ocupados += 1;
+  }
+
+  const capacidadeTotal = TODOS_ASSENTOS.length;
+  const disponiveis = capacidadeTotal - pendentes - ocupados;
+  const taxaOcupacao = Number(((ocupados / capacidadeTotal) * 100).toFixed(1));
+
+  return {
+    disponiveis,
+    pendentes,
+    ocupados,
+    capacidadeTotal,
+    taxaOcupacao,
+  };
+}
+
+export async function listarResumoSessoes(): Promise<SessaoResumo[]> {
+  const agora = Date.now();
+  const sessoes = await prisma.sessao.findMany({
+    include: {
+      assentos: {
+        where: { status: { in: [STATUS.PENDENTE, STATUS.OCUPADO] } },
+        select: { status: true },
+      },
+    },
+    orderBy: { dataHoraFim: "asc" },
+  });
+
+  return sessoes.map((sessao) => {
+    const statuses = sessao.assentos.map(
+      (assento) => assento.status as StatusAssento
+    );
+    return {
+      sessionId: sessao.id,
+      dataHoraFim: sessao.dataHoraFim,
+      encerrada: sessao.dataHoraFim.getTime() < agora,
+      resumo: calcularResumo(statuses),
+    };
+  });
+}
+
+export async function buscarMapaSessao(sessionId: string): Promise<SessaoMapa> {
+  const sessao = await prisma.sessao.findUnique({
+    where: { id: sessionId },
+    include: {
+      assentos: {
+        where: { status: { in: [STATUS.PENDENTE, STATUS.OCUPADO] } },
+        select: { numero: true, status: true },
+      },
+    },
+  });
+
+  const statusMap = new Map<string, StatusAssento>(
+    TODOS_ASSENTOS.map((numero) => [numero, STATUS.DISPONIVEL])
+  );
+
+  if (sessao) {
+    for (const assento of sessao.assentos) {
+      statusMap.set(assento.numero, assento.status as StatusAssento);
+    }
+  }
+
+  const assentos = TODOS_ASSENTOS.map((numero) => ({
+    numero,
+    status: statusMap.get(numero) ?? STATUS.DISPONIVEL,
+  }));
+
+  const resumo = calcularResumo(assentos.map((assento) => assento.status));
+
+  return {
+    sessionId,
+    existe: Boolean(sessao),
+    dataHoraFim: sessao?.dataHoraFim ?? null,
+    encerrada: sessao ? sessao.dataHoraFim.getTime() < Date.now() : false,
+    resumo,
+    assentos,
+  };
 }
 
 export async function buscarAssentosIndisponiveis(

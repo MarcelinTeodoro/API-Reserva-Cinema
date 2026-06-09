@@ -1,8 +1,13 @@
 import "dotenv/config";
 import { buildServer } from "./server";
 import { iniciarCronLiberacao } from "./jobs/liberarPendentes";
+import {
+  instalarEspelhoDoConsole,
+  registrarLogConsole,
+} from "./lib/dashboardConsole";
 
 async function main() {
+  instalarEspelhoDoConsole();
   const app = buildServer();
   const port = Number(process.env.PORT ?? 6999);
 
@@ -12,6 +17,7 @@ async function main() {
     iniciarCronLiberacao();
   } catch (err) {
     app.log.error(err);
+    registrarLogConsole("ERROR", "SERVER", "Falha ao iniciar a API.");
     process.exit(1);
   }
 }

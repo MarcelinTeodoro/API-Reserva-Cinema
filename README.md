@@ -46,6 +46,12 @@ Por padrao, o servidor roda em:
 http://localhost:6999
 ```
 
+Dashboard web:
+
+```text
+http://localhost:6999/
+```
+
 ## Variaveis de Ambiente
 
 ```env
@@ -66,6 +72,88 @@ Estados internos dos assentos:
 Assentos disponiveis nao ficam gravados como linhas fixas no banco. Eles sao calculados removendo da lista total os assentos pendentes ou ocupados.
 
 ## Rotas
+
+### GET /
+
+Abre o dashboard web com visao de sessoes e mapa de assentos.
+
+### GET /dashboard/logs
+
+Retorna logs do console do dashboard (entradas e respostas HTTP em memoria).
+
+Query params opcionais:
+
+- `since`: retorna apenas logs com `id` maior que esse valor
+- `limit`: quantidade maxima de linhas (padrao 120, maximo 250)
+
+Resposta:
+
+```json
+{
+  "logs": [
+    {
+      "id": 10,
+      "timestamp": "2026-05-29T23:11:22.000Z",
+      "level": "SUCCESS",
+      "source": "HTTP",
+      "message": "<< GET /sessoes 200 (5ms)"
+    }
+  ],
+  "cursor": 10,
+  "totalBuffer": 18
+}
+```
+
+### GET /sessoes
+
+Lista resumo das sessoes registradas no banco.
+
+Resposta:
+
+```json
+{
+  "sessoes": [
+    {
+      "sessionId": "sessao-1",
+      "dataHoraFim": "2026-06-01T23:00:00.000Z",
+      "encerrada": false,
+      "resumo": {
+        "disponiveis": 45,
+        "pendentes": 1,
+        "ocupados": 4,
+        "capacidadeTotal": 50,
+        "taxaOcupacao": 8
+      }
+    }
+  ]
+}
+```
+
+### GET /sessoes/:sessionId/mapa
+
+Retorna o mapa completo de 50 assentos da sessao com status por assento.
+
+Resposta:
+
+```json
+{
+  "sessionId": "sessao-1",
+  "existe": true,
+  "dataHoraFim": "2026-06-01T23:00:00.000Z",
+  "encerrada": false,
+  "resumo": {
+    "disponiveis": 45,
+    "pendentes": 1,
+    "ocupados": 4,
+    "capacidadeTotal": 50,
+    "taxaOcupacao": 8
+  },
+  "assentos": [
+    { "numero": "A1", "status": "DISPONIVEL" },
+    { "numero": "A2", "status": "OCUPADO" }
+  ]
+}
+```
 
 ### GET /sessoes/:sessionId/assentos
 
